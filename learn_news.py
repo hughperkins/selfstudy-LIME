@@ -21,8 +21,8 @@ import urllib.request
 import hashlib
 
 
-categories = ['alt.atheism', 'soc.religion.christian']
-
+global_categories = ['atheism', 'religion']
+news_categories = ['alt.atheism', 'soc.religion.christian']
 
 religion_url = 'https://github.com/marcotcr/lime-experiments/blob/master/religion_dataset.tar.gz?raw=true'
 
@@ -96,45 +96,65 @@ def fetch_religion():
     return sklearn.datasets.base.Bunch(data=examples, target=y)
 
 
+class Model(object):
+    def __init__(self, trainer):
+        self.trainer = trainer
+        trainers = {
+            'nb': MultinomialNB(),
+            'sgd': SGDClassifier(loss='hinge', penalty='l2',
+                                 alpha=1e-3, n_iter=5, random_state=123),
+            'rbf': SVC(C=1000000, kernel='rbf')
+        }
+        self.model = trainers[trainer]
+        print('trainer: %s' % trainer)
+
+    def train(self):
+        twenty_train = fetch_20newsgroups(subset='train', categories=news_categories, shuffle=True, random_state=123)
+        self.count_vect = CountVectorizer()
+        X_train_counts = self.count_vect.fit_transform(twenty_train.data)
+
+        self.tfidf_transformer = TfidfTransformer()
+        X_train_tfidf = self.tfidf_transformer.fit_transform(X_train_counts)
+
+        # model = MultinomialNB()
+        self.model.fit(X_train_tfidf, twenty_train.target)
+        train_pred = self.model.predict(X_train_tfidf)
+        train_num_right = np.equal(train_pred, twenty_train.target).sum()
+        print('train', train_num_right, train_num_right / len(twenty_train.target) * 100)
+        # return model
+
+    def test(self):
+        twenty_test = fetch_20newsgroups(subset='test', categories=news_categories, shuffle=True, random_state=123)
+        X_test_counts = self.count_vect.transform(twenty_test.data)
+
+        X_test_tfidf = self.tfidf_transformer.transform(X_test_counts)
+        test_pred = self.model.predict(X_test_tfidf)
+        test_num_right = np.equal(test_pred, twenty_test.target).sum()
+        print('test', test_num_right, test_num_right / len(twenty_test.target) * 100)
+
+        # now try religion dataset, from https://github.com/marcotcr/lime-experiments/blob/master/religion_dataset.tar.gz
+        religion_test = fetch_religion()
+        religion_X_test_counts = self.count_vect.transform(religion_test.data)
+        religion_X_test_tfidf = self.tfidf_transformer.transform(religion_X_test_counts)
+        religion_test_pred = self.model.predict(religion_X_test_tfidf)
+        religion_test_num_right = np.equal(religion_test_pred, religion_test.target).sum()
+        print('religion test', religion_test_num_right, religion_test_num_right / len(religion_test.target) * 100)
+
+    def query(self, phrase):
+        query_counts = self.count_vect.transform([phrase])
+        query_tfidf = self.tfidf_transformer.transform(query_counts)
+        preds = self.model.predict(query_tfidf)
+        pred = preds[0]
+        print('pred', pred)
+        print(global_categories[pred])
+        return global_categories[pred]
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--trainer', type=str, default='nb', help='[nb|sgd|rbf]')
     args = parser.parse_args()
 
-    trainers = {
-        'nb': MultinomialNB(),
-        'sgd': SGDClassifier(loss='hinge', penalty='l2',
-                             alpha=1e-3, n_iter=5, random_state=123),
-        'rbf': SVC(C=1000000, kernel='rbf')
-    }
-    model = trainers[args.trainer]
-    print('trainer: %s' % args.trainer)
-
-    twenty_train = fetch_20newsgroups(subset='train', categories=categories, shuffle=True, random_state=123)
-    count_vect = CountVectorizer()
-    X_train_counts = count_vect.fit_transform(twenty_train.data)
-
-    tfidf_transformer = TfidfTransformer()
-    X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
-
-    # model = MultinomialNB()
-    model.fit(X_train_tfidf, twenty_train.target)
-    train_pred = model.predict(X_train_tfidf)
-    train_num_right = np.equal(train_pred, twenty_train.target).sum()
-    print('train', train_num_right, train_num_right / len(twenty_train.target) * 100)
-
-    twenty_test = fetch_20newsgroups(subset='test', categories=categories, shuffle=True, random_state=123)
-    X_test_counts = count_vect.transform(twenty_test.data)
-
-    X_test_tfidf = tfidf_transformer.transform(X_test_counts)
-    test_pred = model.predict(X_test_tfidf)
-    test_num_right = np.equal(test_pred, twenty_test.target).sum()
-    print('test', test_num_right, test_num_right / len(twenty_test.target) * 100)
-
-    # now try religion dataset, from https://github.com/marcotcr/lime-experiments/blob/master/religion_dataset.tar.gz
-    religion_test = fetch_religion()
-    religion_X_test_counts = count_vect.transform(religion_test.data)
-    religion_X_test_tfidf = tfidf_transformer.transform(religion_X_test_counts)
-    religion_test_pred = model.predict(religion_X_test_tfidf)
-    religion_test_num_right = np.equal(religion_test_pred, religion_test.target).sum()
-    print('religion test', religion_test_num_right, religion_test_num_right / len(religion_test.target) * 100)
+    model = Model(args.trainer)
+    model.train()
+    model.test()
