@@ -10,6 +10,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import SGDClassifier
+from sklearn.svm import SVC
+import argparse
 import numpy as np
 import shutil
 import os
@@ -95,6 +97,19 @@ def fetch_religion():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--trainer', type=str, default='nb', help='[nb|sgd|rbf]')
+    args = parser.parse_args()
+
+    trainers = {
+        'nb': MultinomialNB(),
+        'sgd': SGDClassifier(loss='hinge', penalty='l2',
+                             alpha=1e-3, n_iter=5, random_state=123),
+        'rbf': SVC(C=1000000, kernel='rbf')
+    }
+    model = trainers[args.trainer]
+    print('trainer: %s' % args.trainer)
+
     twenty_train = fetch_20newsgroups(subset='train', categories=categories, shuffle=True, random_state=123)
     count_vect = CountVectorizer()
     X_train_counts = count_vect.fit_transform(twenty_train.data)
@@ -103,8 +118,6 @@ if __name__ == '__main__':
     X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
 
     # model = MultinomialNB()
-    model = SGDClassifier(loss='hinge', penalty='l2',
-                          alpha=1e-3, n_iter=5, random_state=123)
     model.fit(X_train_tfidf, twenty_train.target)
     train_pred = model.predict(X_train_tfidf)
     train_num_right = np.equal(train_pred, twenty_train.target).sum()
