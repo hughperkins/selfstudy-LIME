@@ -26,6 +26,14 @@ def explain():
     return jsonify({'res': res})
 
 
+@app.route('/api/v1/draw_samples/<set>/<subset>/<int:count>/<int:class_id>')
+def draw_samples(set, subset, count, class_id):
+    # count = request.args.get('count', 1)
+    # print('res', res)
+    samples = model.draw_samples(set, subset, count, class_id)
+    return jsonify({'samples': samples})
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--trainer', type=str, default='nb', help='[nb|sgd|rbf]')

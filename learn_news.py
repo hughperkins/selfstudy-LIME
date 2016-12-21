@@ -5,6 +5,7 @@ Learn 20 news groups, using bag-of-words
 from sklearn.datasets import fetch_20newsgroups
 import tarfile
 import sklearn.datasets
+import random
 from collections import defaultdict
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
@@ -109,28 +110,48 @@ class Model(object):
         print('trainer: %s' % trainer)
 
     def train(self):
-        twenty_train = fetch_20newsgroups(subset='train', categories=news_categories, shuffle=True, random_state=123)
+        self.twenty_train = fetch_20newsgroups(subset='train', categories=news_categories, shuffle=True, random_state=123)
         self.count_vect = CountVectorizer()
-        X_train_counts = self.count_vect.fit_transform(twenty_train.data)
+        X_train_counts = self.count_vect.fit_transform(self.twenty_train.data)
 
         self.tfidf_transformer = TfidfTransformer()
         X_train_tfidf = self.tfidf_transformer.fit_transform(X_train_counts)
 
         # model = MultinomialNB()
-        self.model.fit(X_train_tfidf, twenty_train.target)
+        self.model.fit(X_train_tfidf, self.twenty_train.target)
         train_pred = self.model.predict(X_train_tfidf)
-        train_num_right = np.equal(train_pred, twenty_train.target).sum()
-        print('train', train_num_right, train_num_right / len(twenty_train.target) * 100)
+        train_num_right = np.equal(train_pred, self.twenty_train.target).sum()
+        print('train', train_num_right, train_num_right / len(self.twenty_train.target) * 100)
         # return model
 
+    def draw_samples(self, set='twentynewsgroups', subset='train', count=1, class_id=0):
+        data = None
+        if set == 'twenty':
+            data = self.twenty_train if subset == 'train' else self.twenty_test
+        elif set == 'religion':
+            if subset == 'test':
+                data = self.religion_test
+        assert data is not None
+        # data = sets[set][subset]
+        samples = []
+        while len(samples) < count:
+            idx = random.randint(0, len(data.target) + 1)
+            if data.target[idx] != class_id:
+                continue
+            sample = data.data[idx]
+            samples.append(sample)
+        # idxs = np.random.choice(len(data.target), replace=False, size=(count,))
+        # return data.data[idxs]
+        return samples
+
     def test(self):
-        twenty_test = fetch_20newsgroups(subset='test', categories=news_categories, shuffle=True, random_state=123)
-        X_test_counts = self.count_vect.transform(twenty_test.data)
+        self.twenty_test = fetch_20newsgroups(subset='test', categories=news_categories, shuffle=True, random_state=123)
+        X_test_counts = self.count_vect.transform(self.twenty_test.data)
 
         X_test_tfidf = self.tfidf_transformer.transform(X_test_counts)
         test_pred = self.model.predict(X_test_tfidf)
-        test_num_right = np.equal(test_pred, twenty_test.target).sum()
-        print('test', test_num_right, test_num_right / len(twenty_test.target) * 100)
+        test_num_right = np.equal(test_pred, self.twenty_test.target).sum()
+        print('test', test_num_right, test_num_right / len(self.twenty_test.target) * 100)
 
         # now try religion dataset, from https://github.com/marcotcr/lime-experiments/blob/master/religion_dataset.tar.gz
         religion_test = fetch_religion()
